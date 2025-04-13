@@ -29,7 +29,7 @@ def rr_test():
     model_list = ['rr']
     physiology_detector.init(model_list)
 
-    vid_path = "rtsp://admin:baomi521@192.168.1.64:554/Streaming/Channels/201"
+    vid_path = "rtsp://xxxxx@192.168.1.64:554/Streaming/Channels/201"
     cap = cv2.VideoCapture(vid_path)
     fps = 25
     # 定义一个窗口以便于观察
