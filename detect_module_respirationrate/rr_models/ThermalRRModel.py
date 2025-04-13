@@ -7,6 +7,8 @@
 # @File    : MyThermalRRModel.py
 # @Software: PyCharm
 """
+from typing import Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -259,7 +261,7 @@ class ThermRNet(nn.Module):
             dropout_rate: float = 0.2,
             in_channels: int = 3,
             frame: int = 160,
-            image_size: int = 96,
+            image_size: Optional[int] = 96,
     ):
         global config
         super().__init__()
@@ -272,7 +274,7 @@ class ThermRNet(nn.Module):
         # input(b, c, t, h, w),  (b, 3, 160, 96, 96)
 
         self.Stem0 = nn.Sequential(
-            nn.Conv3d(3, dim // 16, [3, 3, 3], stride=1, padding=[2, 2, 2]),
+            nn.Conv3d(3, dim // 16, [3, 3, 3], stride=1, padding=1),
             nn.BatchNorm3d(dim // 16),
             nn.ReLU(inplace=True),
             nn.Dropout3d(self.dropout_rate),
@@ -308,7 +310,8 @@ class ThermRNet(nn.Module):
             nn.Dropout3d(self.dropout_rate),
             nn.MaxPool3d((1, 2, 2), stride=(1, 2, 2)),
         )  # (b, dim, 40, 3, 3)
-
+        self.pos_embedding = nn.Parameter(torch.randn(1, 40 * 3 * 3, dim))  # 位置编码就是一个向量
+        # 拿CNN做embedding了
         self.transformer1 = Transformer_ST_TDC_gra_sharp(num_layers=config.NUM_LAYERS, dim=dim,
                                                          num_heads=config.NUM_HEADS,
                                                          ff_dim=config.FF_DIM, dropout=self.dropout_rate,
@@ -317,6 +320,8 @@ class ThermRNet(nn.Module):
                                                          num_heads=config.NUM_HEADS,
                                                          ff_dim=config.FF_DIM, dropout=self.dropout_rate,
                                                          theta=config.THETA)  # (b, 3 *3 * 40, dim)
+        # 在残差连接后添加
+        self.post_res_norm = nn.InstanceNorm3d(dim, affine=True)
 
         # 解码阶段需要逐步恢复分辨率
         # nn.Upsample(scale_factor=(8,1,1)) 将特征图在时间维度上放大8倍，而在空间维度上保持不变。这意味着如果输入是一个T×H×W的张量，那么输出将会是8T×H×W
@@ -334,23 +339,28 @@ class ThermRNet(nn.Module):
             nn.ELU(),
             nn.Dropout3d(self.dropout_rate),
         )  # (b, dim // 2, 160, 3, 3)
-        self.final_maxpool3d = nn.MaxPool3d((1, 3, 3), stride=(1, 3, 3))  # 输出为(b, dim // 2, 160, 1, 1)
+        # self.final_maxpool3d = nn.MaxPool3d((1, 3, 3), stride=(1, 3, 3))  # 输出为(b, dim // 2, 160, 1, 1)
         # 用conv1d代替最后的全连接层
         self.ConvBlockLast = nn.Conv1d(dim // 2, 2, 1, stride=1, padding=0)  # 最后输出为两个通道，表示属于每个类的概率
 
-        # Initialize weights
-        # self.init_weights()
+        # # conv1d效果不好，换为全连接层
+        # self.classifier = nn.Sequential(
 
-    # @torch.no_grad()
-    # def init_weights(self):
-    #     def _init(m):
-    #         if isinstance(m, nn.Linear):
-    #             nn.init.xavier_uniform_(
-    #                 m.weight)  # _trunc_normal(m.weight, std=0.02)  # from .initialization import _trunc_normal
-    #             if hasattr(m, 'bias') and m.bias is not None:
-    #                 nn.init.normal_(m.bias, std=1e-6)  # nn.init.constant(m.bias, 0)
-    #
-    #     self.apply(_init)
+        # )
+
+        # Initialize weights
+        self.init_weights()
+
+    @torch.no_grad()
+    def init_weights(self):
+        def _init(m):
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(
+                    m.weight)  # _trunc_normal(m.weight, std=0.02)  # from .initialization import _trunc_normal
+                if hasattr(m, 'bias') and m.bias is not None:
+                    nn.init.normal_(m.bias, std=1e-6)  # nn.init.constant(m.bias, 0)
+
+        self.apply(_init)
 
     def forward(self, x):
         b, c, t, fh, fw = x.shape
@@ -358,15 +368,25 @@ class ThermRNet(nn.Module):
         x = self.Stem1(x)
         x = self.Stem2(x)  # [B, 64, 160, 64, 64]
         x = self.Stem3(x)
-        x = self.Stem4(x)
-        x = x.flatten(2).transpose(1, 2)  # [B, 3 *3 * 40, dim]
-        Trans_features1, Score1 = self.transformer1(x, self.gra_sharp)  # (b, 3 *3 * 40, dim)
-        Trans_features2, Score2 = self.transformer1(Trans_features1, self.gra_sharp)  # (b, 3 *3 * 40, dim)
-        features_last = Trans_features2.transpose(1, 2).view(b, self.dim, 40, 3, 3)  # [B, dim, 40, 3, 3]
-        features_last = self.upsample(features_last)  # [B, dim, 80, 3, 3]
-        features_last = self.upsample2(features_last)  # [B, dim, 160, 3, 3]
-        features_last = self.final_maxpool3d(features_last).squeeze(-1).squeeze(-1)  # 去掉后面两个1的维度
-        logits = self.ConvBlockLast(features_last)  # 输出为(B, 2, 160)
+        x_stem4 = self.Stem4(x)
+
+        x = x_stem4.flatten(2).transpose(1, 2)  # [B, 3 *3 * 40, dim]
+        x += self.pos_embedding  # 添加位置编码
+        x, Score1 = self.transformer1(x, self.gra_sharp)  # (b, 3 *3 * 40, dim)
+        x, Score2 = self.transformer2(x, self.gra_sharp)  # (b, 3 *3 * 40, dim)
+        x = x.transpose(1, 2).view(b, self.dim, 40, 3, 3)  # [B, dim, 40, 3, 3]
+
+        # 添加残差连接：将 Stem4 的输出与 Transformer 的输出相加
+        x = x + x_stem4  # 确保维度一致
+        x = self.post_res_norm(x)
+
+        x = self.upsample(x)  # [B, dim, 80, 3, 3]
+        x = self.upsample2(x)  # [B, dim, 160, 3, 3]
+        # features_last = self.final_maxpool3d(features_last).squeeze(-1).squeeze(-1)  # 去掉后面两个1的维度
+
+        x = torch.mean(x, 3)  # x [B, dim, 160, 3]
+        x = torch.mean(x, 3)  # x [B, dim, 160]
+        logits = self.ConvBlockLast(x)  # 输出为(B, 2, 160)
         return logits
 
 
