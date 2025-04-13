@@ -1,0 +1,3 @@
+yolov11n_tf.pt通过ultralytics提供的yolov11n-pose预训练模型在自建数据集以及公开TFW数据集训练而得   (n表示nano)
+yolov11s_tf.pt通过ultralytics提供的yolov11s-pose预训练模型在自建数据集以及公开TFW数据集训练而得   (s表示small)
+TODO: 可将yolov11n_tf.pt、yolov11s_tf.pt转为onnx模型以进一步提高检测速度
