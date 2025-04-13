@@ -46,6 +46,7 @@ def rr_test():
             break
         # 截取鼻子
         crop_frame = nose_cropper.get_crop_frame(frame)
+
         crop_frame = cv2.resize(crop_frame, (thermal_resize_size, thermal_resize_size),
                                 interpolation=cv2.INTER_LINEAR)  # 差不多用INTER_AREA
 
