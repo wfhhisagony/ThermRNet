@@ -284,7 +284,7 @@ class RRDetectorRealtime:
         return record_data
 
     def process_cropFrames(self, crop_frames, fps):
-        rr = self.physiology_detector.get_rr_with_crop_frames(crop_frames, fps)
+        rr,_ = self.physiology_detector.get_rr_with_crop_frames(crop_frames, fps)
         print(f'rr: {rr}')
         rr = round(rr)
         self.rr_deque.append(rr)

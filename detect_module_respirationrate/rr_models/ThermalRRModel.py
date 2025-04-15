@@ -339,7 +339,7 @@ class ThermRNet(nn.Module):
             nn.ELU(),
             nn.Dropout3d(self.dropout_rate),
         )  # (b, dim // 2, 160, 3, 3)
-        # self.final_maxpool3d = nn.MaxPool3d((1, 3, 3), stride=(1, 3, 3))  # 输出为(b, dim // 2, 160, 1, 1)
+        self.final_maxpool3d = nn.MaxPool3d((1, 3, 3), stride=(1, 3, 3))  # 输出为(b, dim // 2, 160, 1, 1)
         # 用conv1d代替最后的全连接层
         self.ConvBlockLast = nn.Conv1d(dim // 2, 2, 1, stride=1, padding=0)  # 最后输出为两个通道，表示属于每个类的概率
 
@@ -383,6 +383,7 @@ class ThermRNet(nn.Module):
         x = self.upsample(x)  # [B, dim, 80, 3, 3]
         x = self.upsample2(x)  # [B, dim, 160, 3, 3]
         # features_last = self.final_maxpool3d(features_last).squeeze(-1).squeeze(-1)  # 去掉后面两个1的维度
+        # x = self.final_maxpool3d(x).squeeze(-1).squeeze(-1)  # 去掉后面两个1的维度
 
         x = torch.mean(x, 3)  # x [B, dim, 160, 3]
         x = torch.mean(x, 3)  # x [B, dim, 160]
@@ -486,7 +487,8 @@ def get_rr_with_estimate(sequence, fps):
 
 def get_ThermRNet_model(model_path, device=torch.device('cpu'), image_size=96, chunk_len=160):
     model = ThermRNet(dim=96, frame=chunk_len, image_size=image_size)
-    model.load_state_dict(torch.load(model_path, weights_only=True, map_location=torch.device('cpu')))
+    checkpoint = torch.load(model_path, weights_only=True, map_location=torch.device('cpu'))
+    model.load_state_dict(checkpoint)
     model.to(device)
 
     mean = [0.456, 0.456, 0.456]

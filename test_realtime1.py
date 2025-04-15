@@ -58,7 +58,7 @@ def rr_test():
         cv2.waitKey(1)
         thermal_data_list.append(crop_frame)
         if len(thermal_data_list) == N:
-            rr = physiology_detector.get_rr_with_crop_frames(thermal_data_list, fps)
+            rr, _ = physiology_detector.get_rr_with_crop_frames(thermal_data_list, fps)
             print(rr)
             thermal_data_list.clear()
 

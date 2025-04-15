@@ -55,7 +55,7 @@ class PhysiologyDetector:
                 )
             else:
                 rr = fps * 30 / np.mean(valid_segments)
-        return rr
+        return rr, labels
 
     def get_rr_with_crop_frames(self, src_frames, fps):
         """
@@ -86,7 +86,7 @@ class PhysiologyDetector:
                         valid_segments[valid_segments_len:]) * 0.75))
             else:
                 rr = fps * 30 / np.mean(valid_segments)
-        return rr
+        return rr, labels
 
 
 if __name__ == '__main__':
