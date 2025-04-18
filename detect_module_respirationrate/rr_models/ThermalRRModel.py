@@ -415,13 +415,47 @@ def apply_transform_to_video(video, transform):
     return transformed_video
 
 
+# def clean_segments(sequence, fps):
+#     """
+#     去除不符合要求的呼与吸的间隔
+#     sequence：元素为0或1的数组， 0吸入， 1呼出
+#     """
+#     lower_threshold = fps // 2  # 最快的呼吸不超过60次/分钟,也就是呼吸频率不超过1Hz,平均来说呼和吸的频率不超过2Hz
+#     invalid_index_list = sequence >= lower_threshold
+#     cleaned_sequence = sequence[(sequence >= lower_threshold)]
+#     return cleaned_sequence
+
 def clean_segments(sequence, fps):
     """
     去除不符合要求的呼与吸的间隔
     sequence：元素为0或1的数组， 0吸入， 1呼出
     """
-    lower_threshold = fps // 2  # 最快的呼吸不超过60次/分钟,也就是呼吸频率不超过1Hz,平均来说呼和吸的频率不超过2Hz
-    cleaned_sequence = sequence[(sequence >= lower_threshold)]
+    if len(sequence) == 1:
+        return sequence
+    lower_thr = fps // 2  # 最快的呼吸不超过60次/分钟,也就是呼吸频率不超过1Hz,平均来说呼和吸的频率不超过2Hz
+    cleaned_sequence = []
+    i = 0
+    n = len(sequence)
+    while i < n:
+        length = sequence[i]
+        if length < lower_thr:
+            # 处理“短于阈值”的段：
+            if not cleaned_sequence:
+                # 这是第一个段，合到后面去
+                if i + 1 < n:
+                    sequence[i + 1] += length
+                # 不把它放入 cleaned
+            else:
+                # 合到前面那段
+                cleaned_sequence[-1] += length
+                # 同时，如果它后面还有一段，也把那段也合到前面
+                if i + 1 < n:
+                    cleaned_sequence[-1] += sequence[i + 1]
+                    i += 1  # 跳过下一个段
+        else:
+            # 够长，留下来
+            cleaned_sequence.append(length)
+        i += 1
     return cleaned_sequence
 
 
@@ -442,8 +476,10 @@ def count_segments(sequence, fps=25):
     return cleaned_sequence
 
 def get_valid_segments(sequence, fps):
-    segment_counts = count_segments(sequence, fps)
-    valid_counts = segment_counts[1:-1]  # 当segment_counts的长度不大于2时，valid_counts都为空列表
+    # segment_counts = count_segments(sequence, fps)
+    # valid_counts = segment_counts[1:-1]  # 当segment_counts的长度不大于2时，valid_counts都为空列表
+
+    valid_counts = count_segments(sequence, fps)
     return valid_counts
 
 
