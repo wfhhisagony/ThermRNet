@@ -25,6 +25,7 @@ from PIL import Image
 import ultralytics
 import torch
 from ultralytics import YOLO
+sys.path.append("..")
 import rr_detect_config
 
 model_path = rr_detect_config.NOSEDETECTOR_MODEL_PATH
