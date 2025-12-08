@@ -14,3 +14,4 @@ sys.path.insert(0, dir_mytest)
 from .rr_detector import RRDetector
 from .rr_detector_model import RRDetectorModel
 import rr_detect_config
+from .rr_detector_realtime import RRDetectorRealTime

@@ -7,4 +7,5 @@
 # @File    : __init__.py
 # @Software: PyCharm
 """
-from .ThermalRRModel import get_ThermRNet_model, apply_transform_to_video, get_rr_with_estimate, get_valid_segments
+# from .ThermalRRModel_test import get_ThermRNet_model, apply_transform_to_video, get_rr_with_estimate, get_valid_segments
+from .ThermRNet import ThermRNet
